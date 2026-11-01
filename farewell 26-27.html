@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Class 10A Farewell for Preeti Ma'am</title>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #1a1a1a; color: #fff; }
+        #canvas-container { width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; z-index: 1; }
+        #ui-container { position: absolute; z-index: 10; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; }
+        .interactive { pointer-events: auto; }
+        .card { background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); padding: 2rem; border-radius: 20px; box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37); border: 1px solid rgba(255, 255, 255, 0.18); text-align: center; max-width: 80%; width: 400px; }
+        h1 { margin-top: 0; color: #ffcc00; }
+        p { margin: 0.5rem 0; }
+        button { background: linear-gradient(45deg, #ff416c, #ff4b2b); border: none; color: white; padding: 1rem 2rem; font-size: 1.2rem; border-radius: 50px; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; box-shadow: 0 4px 15px rgba(255, 65, 108, 0.4); }
+        button:hover { transform: scale(1.05); box-shadow: 0 6px 20px rgba(255, 65, 108, 0.6); }
+        input { padding: 1rem; border-radius: 10px; border: none; font-size: 1rem; width: 60%; margin-bottom: 1rem; background: rgba(255, 255, 255, 0.2); color: white; text-align: center; }
+        input::placeholder { color: rgba(255, 255, 255, 0.6); }
+        #next-btn { display: none; margin-top: 1rem; }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+</head>
+<body>
+    <div id="canvas-container"></div>
+    <div id="ui-container">
+        <!-- Step 1: Invitation Card -->
+        <div id="invitation-card" class="card interactive">
+            <h1>Farewell Celebration</h1>
+            <p>Class 10A</p>
+            <p>Honoring our Science Teacher</p>
+            <p><strong>Preeti Ma'am</strong></p>
+            <br>
+            <p>Venue: Sankam Residency, Belgaum</p>
+            <p>Time: 5:00 PM to 10:00 PM</p>
+            <br>
+            <button onclick="startSimulation()">Begin Tribute</button>
+        </div>
+
+        <!-- Step 2: Simulation Task -->
+        <div id="simulation-card" class="card interactive" style="display: none;">
+            <h2>Physics Simulation</h2>
+            <p>Tap the car to start. Tap again to stop and calculate its speed.</p>
+            <p id="sim-status" style="font-weight: bold; color: yellow;"></p>
+            <div id="question-area" style="display: none;">
+                <p>Distance: 100 meters</p>
+                <p>Time: <span id="time-val"></span> seconds</p>
+                <input type="number" id="speed-input" placeholder="Enter Speed (m/s)">
+                <br>
+                <button id="submit-speed" onclick="checkSpeed()">Check Speed</button>
+            </div>
+        </div>
+
+        <!-- Step 3: Science Questions -->
+        <div id="quiz-card" class="card interactive" style="display: none;">
+            <h2>Science Quiz</h2>
+            <p id="question-text"></p>
+            <input type="text" id="quiz-input" placeholder="Your Answer">
+            <br>
+            <button id="submit-quiz" onclick="checkQuiz()">Submit Answer</button>
+        </div>
+
+        <button id="next-btn" class="interactive" onclick="nextStep()">Next Stage</button>
+    </div>
+
+    <script>
+        // Three.js Setup
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x1a1a1a);
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        container.appendChild(renderer.domElement);
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+        scene.add(ambientLight);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+        dirLight.position.set(5, 5, 5).normalize();
+        scene.add(dirLight);
+
+        // Ground Plane
+        const groundGeo = new THREE.PlaneGeometry(100, 100);
+        const groundMat = new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.8 });
+        const ground = new THREE.Mesh(groundGeo, groundMat);
+        ground.rotation.x = -Math.PI / 2;
+        scene.add(ground);
+        
+        // Road Grid
+        const grid = new THREE.GridHelper(100, 20, 0xff0000, 0x555555);
+        grid.position.y = 0.01;
+        scene.add(grid);
+
+        // Car Group
+        const car = new THREE.Group();
+        const bodyMat = new THREE.MeshStandardMaterial({ color: 0xff0000, roughness: 0.5 });
+        const wheelMat = new THREE.MeshStandardMaterial({ color: 0x222222 });
+        const bodyGeom = new THREE.BoxGeometry(2, 0.5, 1);
+        const body = new THREE.Mesh(bodyGeom, bodyMat);
+        body.position.y = 0.5;
+        car.add(body);
+        const topGeom = new THREE.BoxGeometry(1.2, 0.4, 0.8);
+        const top = new THREE.Mesh(topGeom, bodyMat);
+        top.position.set(-0.2, 0.9, 0);
+        car.add(top);
+        const wheelGeom = new THREE.CylinderGeometry(0.2, 0.2, 0.2, 16);
+        wheelGeom.rotateX(Math.PI / 2);
+        const wheelOffsets = [[-0.6, 0.2, 0.5], [-0.6, 0.2, -0.5], [0.6, 0.2, 0.5], [0.6, 0.2, -0.5]];
+        wheelOffsets.forEach(offset => {
+            const wheel = new THREE.Mesh(wheelGeom, wheelMat);
+            wheel.position.set(offset[0], offset[1], offset[2]);
+            car.add(wheel);
+        });
+        scene.add(car);
+        car.position.set(-20, 0, 0);
+
+        camera.position.set(0, 5, 15);
+        controls.target.set(0, 0, 0);
+
+        // Animation Loop
+        let isMoving = false;
+        let startTime, stopTime;
+        const distance = 100; // meters
+        let targetSpeed = 20; // 20 m/s
+        let carSpeed = 0;
+
+        function animate() {
+            requestAnimationFrame(animate);
+            if (isMoving) {
+                car.position.x += carSpeed * 0.01;
+                if (car.position.x > 20) car.position.x = -20;
+            }
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        // Interaction Logic
+        let interactionState = 'invite';
+
+        function startSimulation() {
+            document.getElementById('invitation-card').style.display = 'none';
+            document.getElementById('simulation-card').style.display = 'flex';
+            interactionState = 'sim_ready';
+            document.getElementById('sim-status').innerText = "Tap the car to start.";
+        }
+
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+
+        window.addEventListener('click', onPointerDown);
+
+        function onPointerDown(event) {
+            if (interactionState === 'sim_ready' || interactionState === 'sim_running') {
+                mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+                mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+                raycaster.setFromCamera(mouse, camera);
+                const intersects = raycaster.intersectObject(body);
+                if (intersects.length > 0) {
+                    if (!isMoving) {
+                        isMoving = true;
+                        startTime = Date.now();
+                        carSpeed = targetSpeed;
+                        interactionState = 'sim_running';
+                        document.getElementById('sim-status').innerText = "Car is running! Tap again to stop.";
+                    } else if (interactionState === 'sim_running') {
+                        stopTime = Date.now();
+                        isMoving = false;
+                        interactionState = 'sim_stopped';
+                        const timeTaken = (stopTime - startTime) / 1000;
+                        document.getElementById('time-val').innerText = timeTaken.toFixed(2);
+                        document.getElementById('sim-status').innerText = "Car stopped.";
+                        document.getElementById('question-area').style.display = 'block';
+                    }
+                }
+            }
+        }
+
+        function checkSpeed() {
+            const inputSpeed = parseFloat(document.getElementById('speed-input').value);
+            if (Math.abs(inputSpeed - targetSpeed) < 2) {
+                alert("Correct! Speed is approximately " + targetSpeed + " m/s.");
+                document.getElementById('simulation-card').style.display = 'none';
+                document.getElementById('quiz-card').style.display = 'flex';
+                loadQuiz();
+            } else {
+                alert("Incorrect. Try again.");
+            }
+        }
+
+        let currentQuizIndex = 0;
+        const quizData = [
+            { question: "What is the chemical formula for water?", answer: "H2O" },
+            { question: "Which organelle is the powerhouse of the cell?", answer: "Mitochondria" },
+            { question: "What is the speed of light in vacuum (approx x 10^8 m/s)?", answer: "3" }
+        ];
+
+        function loadQuiz() {
+            if (currentQuizIndex < quizData.length) {
+                document.getElementById('question-text').innerText = quizData[currentQuizIndex].question;
+            } else {
+                document.getElementById('quiz-card').innerHTML = "<h2>Thank you Preeti Ma'am! You've successfully prepared us for the future!</h2>";
+                document.getElementById('next-btn').style.display = 'block';
+                document.getElementById('next-btn').innerText = "Restart";
+                document.getElementById('next-btn').onclick = () => location.reload();
+            }
+        }
+
+        function checkQuiz() {
+            const userAnswer = document.getElementById('quiz-input').value.trim();
+            if (userAnswer.toLowerCase() === quizData[currentQuizIndex].answer.toLowerCase()) {
+                alert("Correct!");
+                currentQuizIndex++;
+                document.getElementById('quiz-input').value = '';
+                loadQuiz();
+            } else {
+                alert("Incorrect. Try again.");
+            }
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>
